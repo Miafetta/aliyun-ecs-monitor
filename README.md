@@ -135,14 +135,26 @@ touch accounts.json webhook.txt
 
 ### 4. 构建与启动
 
-先构建镜像，再运行只读诊断：
+先构建镜像，再运行只读诊断和通知测试：
 
 ```sh
 docker compose build
 docker compose run --rm monitor --diagnose
+docker compose run --rm monitor --test-notification
 ```
 
-诊断模式只查询，不启停实例、不发送通知、不保存状态。确认账号、实例和用量正确后启动：
+只读诊断查询账号、实例和用量，不启停实例、不发送通知。通知测试依次向飞书群发送以下卡片，标题均带“通知测试”：
+
+| 卡片 | 内容 |
+|---|---|
+| 查询异常、共享池达到阈值 | 模拟查询失败和用量达到阈值的场景 |
+| 请求已提交、操作已完成、操作等待超时、控制请求失败 | 分别展示启动、停止两种操作的通知，共八张 |
+| 每日报告 | 展示账号用量、实例状态及维护暂停的示例 |
+| CDT 真实用量（最后发送） | 只读查询各账号受监控流量池的实际 CDT 用量，并标注查询时间 |
+
+前十一张是明确标注的示例，不代表真实事件；最后发送的用量汇总来自本次 CDT 查询。长汇总可能拆为多张卡片。两种模式均不启停实例、不修改运行状态，可在服务运行时执行。通知测试需要有效账号凭据、CDT 查询权限和 Webhook。
+
+通知测试成功时终端显示 `Notification test completed: ok`。任何卡片发送或账号用量查询失败时，仍会继续其余测试并尝试发送最后的汇总，然后返回非零退出码；查询失败的账号会明确标记，使用前修正配置错误。确认诊断结果正确且群内收到测试卡片后启动：
 
 ```sh
 docker compose up -d
@@ -160,6 +172,9 @@ docker compose logs --tail=100 monitor
 
 # 检查配置（可在服务运行时执行）
 docker compose run --rm monitor --diagnose
+
+# 测试全部通知类型，并在最后查询真实 CDT 用量
+docker compose run --rm monitor --test-notification
 
 # 修改配置后重新创建容器
 docker compose up -d --force-recreate
@@ -278,6 +293,12 @@ python -m src.monitor --preview
 
 ```sh
 python -m src.monitor --diagnose
+```
+
+配置账号凭据与飞书 Webhook 后，可以测试全部通知类型和真实 CDT 用量：
+
+```sh
+python -m src.monitor --test-notification
 ```
 
 本地持续运行使用 `python -m src.monitor --serve`，文件锁互斥适用于 Linux。账号和飞书分别通过 `ALIYUN_ACCOUNTS_FILE`、`FEISHU_WEBHOOK_FILE` 读取；未指定文件时，也支持 `ALIYUN_ACCOUNTS_JSON`、`FEISHU_WEBHOOK_URL` 环境变量。文件配置优先。
