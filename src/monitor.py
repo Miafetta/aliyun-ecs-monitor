@@ -189,8 +189,12 @@ class Aliyun:
 
 
 def cards(title, sections):
+    sent_at = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+
     def card(elements):
-        return {"msg_type": "interactive", "card": {"schema": "2.0", "header": {"template": "blue", "title": {"tag": "plain_text", "content": "ECS Monitor \xb7 " + title}}, "body": {"elements": elements}}}
+        meta = {"tag": "markdown", "content": "**\U0001f552 \u65f6\u95f4\uff08\u5317\u4eac\u65f6\u95f4\uff09\uff1a** " + sent_at}
+        footer = {"tag": "markdown", "content": "\U0001f916 \u7531 **ECS Monitor** \u81ea\u52a8\u53d1\u9001", "text_size": "notation"}
+        return {"msg_type": "interactive", "card": {"schema": "2.0", "config": {"update_multi": True, "width_mode": "default"}, "header": {"template": "blue", "title": {"tag": "plain_text", "content": "ECS Monitor " + title}}, "body": {"direction": "vertical", "padding": "12px 12px 12px 12px", "elements": [meta] + elements + [{"tag": "hr"}, footer]}}}
     elements = []
     for section in sections:
         # Bound both UTF-8 bytes and component count, including an oversized section.
@@ -199,11 +203,11 @@ def cards(title, sections):
             addition = [{"tag": "hr"}]
             if offset == 0 and content.startswith("### "):
                 heading, _, content = content.partition("\n")
-                addition.append({"tag": "markdown", "content": heading[4:], "text_size": "heading"})
+                addition.append({"tag": "markdown", "content": heading[4:], "text_size": "heading-3"})
             if content:
                 addition.append({"tag": "markdown", "content": content})
             candidate = card(elements + addition)
-            if elements and (len(json.dumps(candidate, ensure_ascii=False).encode()) > 24000 or len(elements) + len(addition) > 100):
+            if elements and (len(json.dumps(candidate, ensure_ascii=False).encode()) > 24000 or len(candidate["card"]["body"]["elements"]) > 100):
                 yield card(elements)
                 elements = []
             elements.extend(addition)
@@ -272,7 +276,7 @@ class Monitor:
         if stamp - self.state["events"].get(key, 0) < cooldown:
             return True
         try:
-            self.notifier.send(title, [content])
+            self.notifier.send(title, [content] if isinstance(content, str) else content)
         except MonitorError:
             self.failed = True
             print("ERROR: Feishu delivery failed", file=sys.stderr)
@@ -287,22 +291,22 @@ class Monitor:
             statuses = {i["id"]: api.status(i) for i in account["instances"] if not i.get("paused")}
         except Exception as error:
             self.failed = True
-            self.sections.append(f"### \u26a0\ufe0f {name}\n\u67e5\u8be2\u5f02\u5e38\uff1b\u672c\u8f6e\u4fdd\u6301\u8be5\u8d26\u53f7\u5168\u90e8\u5b9e\u4f8b\u72b6\u6001\u3002")
-            self.notify(state_key(name, "query"), "\u67e5\u8be2\u5f02\u5e38", f"### \u26a0\ufe0f {name}\nCDT \u6216 ECS \u67e5\u8be2\u5f02\u5e38\uff1b\u672c\u8f6e\u672a\u6267\u884c\u63a7\u5236\u3002\u8bf7\u8fd0\u884c\u53ea\u8bfb\u8bca\u65ad\u5e76\u68c0\u67e5\u6743\u9650\u3001\u5730\u57df\u548c\u54cd\u5e94\u5b8c\u6574\u6027\u3002")
+            self.sections.append(f"### \u26a0\ufe0f \u67e5\u8be2\u5f02\u5e38\n**\u8d26\u53f7\uff1a** {name}\n\u67e5\u8be2\u5f02\u5e38\uff1b\u672c\u8f6e\u4fdd\u6301\u8be5\u8d26\u53f7\u5168\u90e8\u5b9e\u4f8b\u72b6\u6001\u3002")
+            self.notify(state_key(name, "query"), "\u67e5\u8be2\u5f02\u5e38", f"### \u26a0\ufe0f \u67e5\u8be2\u5f02\u5e38\n**\u8d26\u53f7\uff1a** {name}\nCDT \u6216 ECS \u67e5\u8be2\u5f02\u5e38\uff1b\u672c\u8f6e\u672a\u6267\u884c\u63a7\u5236\u3002\u8bf7\u8fd0\u884c\u53ea\u8bfb\u8bca\u65ad\u5e76\u68c0\u67e5\u6743\u9650\u3001\u5730\u57df\u548c\u54cd\u5e94\u5b8c\u6574\u6027\u3002")
             print("ERROR: Account query failed; control withheld", file=sys.stderr)
             if isinstance(error, MonitorError):
                 print("ERROR: " + str(error), file=sys.stderr)
             return
         for category in sorted({pool(i["region"]) for i in account["instances"]}):
-            self.sections.append(f"### \U0001f4ca {name} \xb7 {POOL_NAMES[category]}\n\u5171\u4eab\u6c60\uff1a{totals[category] / GB:.3f} GB / {account['limits_gb'][category]} GB")
+            self.sections.append(f"### \U0001f4ca \u5171\u4eab\u6d41\u91cf\u6c60\n**\u8d26\u53f7\uff1a** {name}\n**\u6d41\u91cf\u6c60\uff1a** {POOL_NAMES[category]}\n**\u7528\u91cf\uff1a** {totals[category] / GB:.3f} GB\n**\u9608\u503c\uff1a** {account['limits_gb'][category]} GB")
         for instance in account["instances"]:
             category = pool(instance["region"])
-            label = f"{name} \xb7 {POOL_NAMES[category]} \xb7 {instance['name']} ({instance['id']}, {instance['region']})"
+            label = f"**\u8d26\u53f7\uff1a** {name}\n**\u6d41\u91cf\u6c60\uff1a** {POOL_NAMES[category]}\n**\u5b9e\u4f8b\u540d\u79f0\uff1a** {instance['name']}\n**\u5b9e\u4f8b ID\uff1a** `{instance['id']}`\n**\u5730\u57df\uff1a** `{instance['region']}`"
             if instance.get("paused"):
-                self.sections.append(f"\u23f8\ufe0f {label}\uff1a\u81ea\u52a8\u63a7\u5236\u5df2\u6682\u505c")
+                self.sections.append(f"### \u23f8\ufe0f \u7ef4\u62a4\u6682\u505c\n{label}\n**\u72b6\u6001\uff1a** \u81ea\u52a8\u63a7\u5236\u5df2\u6682\u505c")
                 continue
             status = statuses[instance["id"]]
-            self.sections.append(f"\U0001f5a5\ufe0f {label}\uff1a{status}")
+            self.sections.append(f"### \U0001f5a5\ufe0f \u5b9e\u4f8b\u72b6\u6001\n{label}\n**\u72b6\u6001\uff1a** {status}")
             if self.diagnostic:
                 continue
             key = state_key(name, instance["region"], instance["id"])
@@ -310,39 +314,39 @@ class Monitor:
             if pending:
                 action = pending["action"]
                 if not pending["notified"]:
-                    pending["notified"] = self.notify(state_key(key, "submitted", pending["at"]), "\u8bf7\u6c42\u5df2\u63d0\u4ea4", f"### \U0001f4e8 {label}\n{ACTION_NAMES[action]} \u8bf7\u6c42\u5df2\u63d0\u4ea4\uff1b\u7b49\u5f85\u5b9e\u9645\u72b6\u6001\u786e\u8ba4\u3002", 0)
+                    pending["notified"] = self.notify(state_key(key, "submitted", pending["at"]), "\u8bf7\u6c42\u5df2\u63d0\u4ea4", [f"### \U0001f5a5\ufe0f \u5b9e\u4f8b\u4fe1\u606f\n{label}", f"### \U0001f4e8 \u8bf7\u6c42\u5df2\u63d0\u4ea4\n{ACTION_NAMES[action]} \u8bf7\u6c42\u5df2\u63d0\u4ea4\uff1b\u7b49\u5f85\u5b9e\u9645\u72b6\u6001\u786e\u8ba4\u3002"], 0)
                 target = "Running" if action == "StartInstance" else "Stopped"
                 if status == target:
-                    if pending["notified"] and self.notify(state_key(key, "completed", pending["at"]), "\u64cd\u4f5c\u5df2\u5b8c\u6210", f"### \u2705 {label}\n{ACTION_NAMES[action]} \u5df2\u5b8c\u6210\uff0c\u67e5\u8be2\u786e\u8ba4\u72b6\u6001\uff1a{target}\u3002", 0):
+                    if pending["notified"] and self.notify(state_key(key, "completed", pending["at"]), "\u64cd\u4f5c\u5df2\u5b8c\u6210", [f"### \U0001f5a5\ufe0f \u5b9e\u4f8b\u4fe1\u606f\n{label}", f"### \u2705 \u64cd\u4f5c\u5df2\u5b8c\u6210\n{ACTION_NAMES[action]} \u5df2\u5b8c\u6210\uff0c\u67e5\u8be2\u786e\u8ba4\u72b6\u6001\uff1a{target}\u3002"], 0):
                         del self.state["pending"][key]
                 elif self.now.timestamp() - pending["at"] > 900:
                     self.failed = True
-                    self.notify(state_key(key, "timeout", pending["at"]), "\u64cd\u4f5c\u7b49\u5f85\u8d85\u65f6", f"### \u26a0\ufe0f {label}\n{ACTION_NAMES[action]} \u8d85\u8fc7 15 \u5206\u949f\u672a\u786e\u8ba4\uff0c\u5f53\u524d\u72b6\u6001\uff1a{status}\uff1b\u540e\u7eed\u91cd\u65b0\u68c0\u67e5\u3002", 0)
+                    self.notify(state_key(key, "timeout", pending["at"]), "\u64cd\u4f5c\u7b49\u5f85\u8d85\u65f6", [f"### \U0001f5a5\ufe0f \u5b9e\u4f8b\u4fe1\u606f\n{label}", f"### \u26a0\ufe0f \u64cd\u4f5c\u7b49\u5f85\u8d85\u65f6\n{ACTION_NAMES[action]} \u8d85\u8fc7 15 \u5206\u949f\u672a\u786e\u8ba4\uff0c\u5f53\u524d\u72b6\u6001\uff1a{status}\uff1b\u540e\u7eed\u91cd\u65b0\u68c0\u67e5\u3002"], 0)
                     del self.state["pending"][key]
                 if status != target:
                     continue
             over = totals[category] >= account["limits_gb"][category] * GB
             action = "StopInstance" if over and status == "Running" else "StartInstance" if not over and status == "Stopped" else None
             if over:
-                self.notify(state_key(key, "over", self.now.strftime("%Y-%m")), "\u5171\u4eab\u6d41\u91cf\u6c60\u8fbe\u5230\u9608\u503c", f"### \U0001f6d1 {label}\n\u5171\u4eab\u6c60 {totals[category] / GB:.3f} GB\uff0c\u9608\u503c {account['limits_gb'][category]} GB\uff1b\u5f53\u524d {status}\u3002", 86400)
+                self.notify(state_key(key, "over", self.now.strftime("%Y-%m")), "\u5171\u4eab\u6d41\u91cf\u6c60\u8fbe\u5230\u9608\u503c", [f"### \U0001f5a5\ufe0f \u5b9e\u4f8b\u4fe1\u606f\n{label}", f"### \U0001f6d1 \u5171\u4eab\u6d41\u91cf\u6c60\u8fbe\u5230\u9608\u503c\n\u5171\u4eab\u6c60 {totals[category] / GB:.3f} GB\uff0c\u9608\u503c {account['limits_gb'][category]} GB\uff1b\u5f53\u524d {status}\u3002"], 86400)
             if action:
                 try:
                     api.act(instance, action)
                 except Exception:
                     self.failed = True
-                    self.notify(state_key(key, action, "failed"), "\u63a7\u5236\u8bf7\u6c42\u5931\u8d25", f"### \u26a0\ufe0f {label}\n{ACTION_NAMES[action]} \u8bf7\u6c42\u5931\u8d25\uff1b\u672a\u786e\u8ba4\u72b6\u6001\u53d8\u5316\uff0c\u4e0b\u8f6e\u91cd\u8bd5\u3002")
+                    self.notify(state_key(key, action, "failed"), "\u63a7\u5236\u8bf7\u6c42\u5931\u8d25", [f"### \U0001f5a5\ufe0f \u5b9e\u4f8b\u4fe1\u606f\n{label}", f"### \u26a0\ufe0f \u63a7\u5236\u8bf7\u6c42\u5931\u8d25\n{ACTION_NAMES[action]} \u8bf7\u6c42\u5931\u8d25\uff1b\u672a\u786e\u8ba4\u72b6\u6001\u53d8\u5316\uff0c\u4e0b\u8f6e\u91cd\u8bd5\u3002"])
                     continue
                 # shortcut: keep the latest action; add an outbox if audit delivery is required.
                 pending = {"action": action, "at": self.now.timestamp(), "notified": False}
                 self.state["pending"][key] = pending
-                pending["notified"] = self.notify(state_key(key, "submitted", pending["at"]), "\u8bf7\u6c42\u5df2\u63d0\u4ea4", f"### \U0001f4e8 {label}\n{ACTION_NAMES[action]} \u8bf7\u6c42\u5df2\u63d0\u4ea4\uff1b\u7b49\u5f85\u4e0b\u4e00\u8f6e\u67e5\u8be2\u786e\u8ba4\u5b9e\u9645\u5b8c\u6210\u3002", 0)
+                pending["notified"] = self.notify(state_key(key, "submitted", pending["at"]), "\u8bf7\u6c42\u5df2\u63d0\u4ea4", [f"### \U0001f5a5\ufe0f \u5b9e\u4f8b\u4fe1\u606f\n{label}", f"### \U0001f4e8 \u8bf7\u6c42\u5df2\u63d0\u4ea4\n{ACTION_NAMES[action]} \u8bf7\u6c42\u5df2\u63d0\u4ea4\uff1b\u7b49\u5f85\u4e0b\u4e00\u8f6e\u67e5\u8be2\u786e\u8ba4\u5b9e\u9645\u5b8c\u6210\u3002"], 0)
 
     def report(self, hour):
         day = self.now.strftime("%Y-%m-%d")
         if self.diagnostic or self.failed or self.now.hour < hour or self.state["report_day"] == day:
             return
         try:
-            self.notifier.send("\u6bcf\u65e5\u62a5\u544a \xb7 " + day, self.sections)
+            self.notifier.send("\u6bcf\u65e5\u62a5\u544a " + day, self.sections)
         except MonitorError:
             self.failed = True
             print("ERROR: Daily report delivery failed", file=sys.stderr)
@@ -460,7 +464,7 @@ def main():
     if args.test_notification:
         return test_notifications()
     if args.preview:
-        print(json.dumps(list(cards("\u6bcf\u65e5\u62a5\u544a", ["### \U0001f4ca \u793a\u4f8b\u8d26\u53f7 \xb7 \u975e\u5185\u5730\n\u5171\u4eab\u6c60\uff1a12.500 GB / 180 GB", "### \U0001f5a5\ufe0f \u793a\u4f8b\u5b9e\u4f8b\n\u72b6\u6001\uff1aRunning\n\u2705 \u7528\u91cf\u4f4e\u4e8e\u9608\u503c"])), ensure_ascii=False, indent=2))
+        print(json.dumps(list(cards("\u6bcf\u65e5\u62a5\u544a", ["### \U0001f4ca \u5171\u4eab\u6d41\u91cf\u6c60\n**\u8d26\u53f7\uff1a** \u793a\u4f8b\u8d26\u53f7114514\n**\u6d41\u91cf\u6c60\uff1a** \u975e\u5185\u5730\n**\u7528\u91cf\uff1a** 114.000 GB\n**\u9608\u503c\uff1a** 180 GB", "### \U0001f5a5\ufe0f \u5b9e\u4f8b\u72b6\u6001\n**\u8d26\u53f7\uff1a** \u793a\u4f8b\u8d26\u53f7114514\n**\u5b9e\u4f8b\u540d\u79f0\uff1a** \u793a\u4f8b\u5b9e\u4f8b1919810\n**\u5b9e\u4f8b ID\uff1a** `i-example1919810`\n**\u5730\u57df\uff1a** `ap-southeast-1`\n**\u72b6\u6001\uff1a** Running"])), ensure_ascii=False, indent=2))
         return 0
     if args.diagnose:
         return run_once(diagnostic=True)
