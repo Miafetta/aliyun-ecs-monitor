@@ -153,6 +153,7 @@ class Aliyun:
 
     def call(self, service, region, action, **params):
         from aliyunsdkcore.request import CommonRequest
+        from aliyunsdkcore.acs_exception.exceptions import ClientException, ServerException
         if region not in self.clients:
             self.clients[region] = self.client_type(self.account["access_key_id"], self.account["access_key_secret"], region, auto_retry=False)
         request = CommonRequest()
@@ -166,10 +167,27 @@ class Aliyun:
         request.set_read_timeout(30)
         for key, value in params.items():
             request.add_query_param(key, value)
+        attempts = 3 if action in {"ListCdtInternetTraffic", "DescribeInstances"} else 1
+        for attempt in range(attempts):
+            try:
+                payload = self.clients[region].do_action_with_exception(request)
+                break
+            except Exception as error:
+                transient = isinstance(error, OSError)
+                if isinstance(error, ClientException):
+                    transient = error.get_error_code() in {"SDK.ServerUnreachable", "SDK.HttpError"}
+                elif isinstance(error, ServerException):
+                    code = error.get_error_code() or ""
+                    transient = error.get_http_status() in {408, 429, 500, 502, 503, 504} or code == "Throttling" or code.startswith("Throttling.")
+                if not transient or attempt + 1 == attempts:
+                    raise MonitorError("Aliyun " + action + " failed after " + str(attempt + 1) + " attempt(s); check RAM permissions and network") from None
+                delay = 2 ** (attempt + 1)
+                print(f"WARNING: Aliyun {action} transient failure; retry {attempt + 1}/2 in {delay}s", file=sys.stderr)
+                time.sleep(delay)
         try:
-            result = json.loads(self.clients[region].do_action_with_exception(request))
-        except Exception:
-            raise MonitorError("Aliyun " + action + " failed; check RAM permissions and network") from None
+            result = json.loads(payload)
+        except (ValueError, TypeError):
+            raise MonitorError("Invalid Aliyun response for " + action) from None
         if not isinstance(result, dict) or "Code" in result:
             raise MonitorError("Invalid Aliyun response for " + action)
         return result
