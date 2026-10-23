@@ -1,5 +1,6 @@
 services:
   monitor:
+    container_name: aliyun-ecs-monitor
     build: .
     restart: unless-stopped
     read_only: true
