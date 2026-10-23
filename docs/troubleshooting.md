@@ -19,12 +19,12 @@
 
 ## 配置被拒绝
 
-`accounts.json` 必须是非空 JSON 数组，不支持注释。检查字段拼写、JSON 格式及以下要求：
+`accounts.json` 使用包含 `accounts` 非空数组的 JSON 对象，可选 `report_hour` 设置日报时间，不支持注释。旧版账号数组格式使用默认日报时间。检查字段拼写、JSON 格式及以下要求：
 
 - 账号名称和 AccessKey ID 不重复，每个账号至少配置一个实例。
 - 阈值为有限的非负数；`paused` 为 `true` 或 `false`，不加引号。
 - 实例 ID 和地域填写正确；配置中不包含额外字段。
-- `REPORT_HOUR` 为空时使用默认值 `5`，设置时应为 `0`～`23` 的整数。
+- `report_hour` 省略时默认 `5`，设置时必须为 `0`～`23` 的 JSON 整数，不能填写字符串、布尔值或 `null`。
 
 ## Account query failed / control withheld
 
@@ -54,7 +54,7 @@ CDT 响应必须包含非空的 `TrafficDetails`。每行需包含受支持的 `
 
 ## 修改配置未生效
 
-确认文件内容有效。若编辑器通过替换文件保存配置，执行 `docker compose up -d --force-recreate` 刷新文件挂载。修改 `.env` 后也需重新创建容器。
+确认文件内容有效。若编辑器通过替换文件保存配置，执行 `docker compose up -d --force-recreate` 刷新文件挂载。原地修改 `report_hour` 后，下一轮读取配置时生效；当天已发送日报时不会重复发送。
 
 ## 状态保存失败
 

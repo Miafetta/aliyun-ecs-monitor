@@ -4,11 +4,14 @@
 
 ## 功能
 
-- 每五分钟检查实例状态和流量用量。
-- 分别管理中国内地与非内地共享池，支持自定义阈值。
-- 用量低于阈值时启动实例，达到阈值时停止实例。
-- 支持按实例暂停自动控制。
-- 使用飞书 Card 2.0 发送启停通知、异常告警和每日汇总。
+| 功能 | 说明 |
+|---|---|
+| 流量监控 | 每五分钟查询账号 CDT 用量，分别统计中国内地与非内地共享池 |
+| 自动启停 | 低于阈值时启动已停止实例，达到阈值时停止运行实例 |
+| 多账号、多实例 | 每个账号单独配置凭据与阈值，账号之间独立处理 |
+| 维护暂停 | 通过 `paused` 暂停指定实例的自动控制 |
+| 飞书通知 | 发送启停请求、完成确认、异常告警和北京时间日报 |
+| 持久化状态 | 保存待确认动作、通知冷却和日报日期，容器重启后继续使用 |
 
 > 自动控制会启动人工关机的实例。维护前，请将对应实例的 `paused` 设为 `true`。调度、用量更新和实际关机存在延迟，阈值控制不能保证零超额费用。
 
@@ -16,9 +19,27 @@
 
 需要安装 Docker Engine 和 Docker Compose 插件。请使用一台持续在线、不会被本监控关停的服务器，并确保能够访问阿里云 API、飞书和镜像源。
 
+部署前准备以下内容：
+
+| 配置项 | 获取位置 | 用途 |
+|---|---|---|
+| RAM 用户 AccessKey ID / Secret | RAM 控制台 → 用户详情 → 创建 AccessKey | 查询用量、查询和启停实例 |
+| 阿里云主账号 UID | 阿里云账号信息 | 填写权限策略的资源 ARN |
+| ECS 实例 ID 与地域 ID | ECS 控制台 → 实例列表 → 实例详情 | 指定受监控实例，见[地域对照表](#地域对照表) |
+| 飞书 Webhook | 飞书群聊 → 自定义机器人配置 | 发送通知与日报 |
+
+部署文件清单：
+
+| 文件 | 内容 | 是否必填 |
+|---|---|---|
+| `accounts.json` | 日报时间、账号凭据、实例列表和流量阈值 | 是 |
+| `webhook.txt` | 飞书机器人 Webhook，单行完整地址 | 是 |
+
 ### 1. 配置阿里云权限
 
-为每个阿里云账号创建用于监控的 RAM 用户，并保存其 AccessKey ID 和 AccessKey Secret。
+1. 使用主账号或 RAM 管理员进入 [RAM 控制台](https://ram.console.aliyun.com/)，创建用于监控的 RAM 用户。
+2. 进入该用户详情，创建 AccessKey，保存生成的 AccessKey ID 和 AccessKey Secret。Secret 仅在创建时显示，操作说明见[创建 AccessKey](https://help.aliyun.com/zh/ram/user-guide/accesskey-pair-management/)。
+3. 为该用户创建并绑定下方权限策略。每个阿里云账号分别操作一次。
 
 进入 **RAM 控制台 → 权限管理 → 权限策略 → 创建权限策略 → 脚本编辑**，粘贴以下 JSON：
 
@@ -52,9 +73,15 @@
 
 ### 2. 配置飞书机器人
 
-在飞书群聊中添加自定义机器人，安全设置选择关键词 **ECS Monitor**，保存 Webhook 地址。若配置 IP 白名单，需允许 部署服务器的公网出口地址。
+1. 打开接收通知的飞书群聊，在群设置的机器人管理中添加自定义机器人。
+2. 安全设置选择关键词，填写 **ECS Monitor**，保存生成的 Webhook 地址。
+3. 将地址写入 `webhook.txt`。如启用 IP 白名单，允许部署服务器的公网出口地址。
+
+卡片标题包含 `ECS Monitor`，告警与日报均发送到这个群。
 
 ### 3. 准备配置
+
+从 [ECS 控制台](https://ecs.console.aliyun.com/)的实例详情复制实例 ID 和地域 ID。配置中的 `region` 与 RAM 策略 ARN 中的地域必须一致，并与实例实际所在地相符。
 
 下载项目并进入目录：
 
@@ -70,39 +97,41 @@ touch accounts.json webhook.txt
 账号配置示例：
 
 ```json
-[
-  {
-    "name": "account-1",
-    "access_key_id": "REPLACE_ACCESS_KEY_ID",
-    "access_key_secret": "REPLACE_ACCESS_KEY_SECRET",
-    "limits_gb": {"mainland": 18, "overseas": 180},
-    "instances": [
-      {
-        "id": "i-exampleTokyo",
-        "region": "ap-northeast-1",
-        "name": "tokyo",
-        "paused": false
+{
+  "report_hour": 5,
+  "accounts": [
+    {
+      "name": "account-1",
+      "access_key_id": "REPLACE_ACCESS_KEY_ID",
+      "access_key_secret": "REPLACE_ACCESS_KEY_SECRET",
+      "limits_gb": {
+        "mainland": 18,
+        "overseas": 180
       },
-      {
-        "id": "i-exampleHongkong",
-        "region": "cn-hongkong",
-        "name": "hongkong",
-        "paused": true
-      }
-    ]
-  }
-]
+      "instances": [
+        {
+          "id": "i-exampleTokyo",
+          "region": "ap-northeast-1",
+          "name": "tokyo",
+          "paused": false
+        },
+        {
+          "id": "i-exampleHongkong",
+          "region": "cn-hongkong",
+          "name": "hongkong",
+          "paused": true
+        }
+      ]
+    }
+  ]
+}
 ```
 
-将 AccessKey 占位符和示例实例 ID 替换为实际值。示例中的香港实例已暂停自动控制，启用前将其 `paused` 改为 `false`。**AccessKey ID 填入 `access_key_id`，主账号 UID 仅用于权限策略的资源 ARN。** 这两个文件包含凭据，已加入 Git 忽略规则；请限制服务器上的读取权限。
+将 AccessKey 占位符和示例实例 ID 替换为实际值。示例中的香港实例已暂停自动控制，启用前将其 `paused` 改为 `false`。**`access_key_id` 填写 AccessKey ID；权限策略 ARN 中的账号段填写主账号 UID。** 这两个文件包含凭据，已加入 Git 忽略规则；请限制服务器上的读取权限。
 
-如需调整日报时间，在项目目录新建 `.env`：
+日报时间由 `accounts.json` 顶层的 `report_hour` 设置，取值为 `0`～`23` 的 JSON 整数，默认 `5`，即北京时间 05:00。宿主机时区不影响日报时间；所有账号汇总为一份日报，每天一次。
 
-```dotenv
-REPORT_HOUR=5
-```
-
-`REPORT_HOUR` 取值为 `0`～`23`，使用北京时间，默认 `5`。宿主机时区不影响日报时间。
+调整该值后，程序在下一轮读取配置时生效；当天已成功发送日报时不会再次发送。旧版仅包含账号数组的配置仍可使用，日报时间为默认的 05:00。需要自定义时间时，请改为上述包含 `report_hour` 和 `accounts` 的对象格式。
 
 ### 4. 构建与启动
 
@@ -143,11 +172,28 @@ docker compose up -d --build
 docker compose down
 ```
 
-凭据文件每轮重新读取，原地修改后会在下一轮生效；编辑器替换文件或修改 `.env` 后，应重新创建容器以确保更新挂载。服务不需要开放入站端口。
+凭据文件每轮重新读取，原地修改后会在下一轮生效；编辑器替换文件后，应重新创建容器以确保更新挂载。服务不需要开放入站端口。
 
 ## 配置说明
 
-每个阿里云账号对应一个配置条目，将该账号全部受监控实例放入同一个 `instances` 数组。
+`accounts.json` 顶层配置如下：
+
+| 字段 | 说明 |
+|---|---|
+| `report_hour` | 日报发送小时，使用北京时间，整数 `0`～`23`，省略时默认 `5` |
+| `accounts` | 非空账号数组，每个阿里云账号对应一个条目 |
+
+将同一账号全部受监控实例放入该条目的 `instances` 数组。
+
+| 使用场景 | 配置方式 |
+|---|---|
+| 单账号、单实例 | 数组中保留一个账号，`instances` 中保留一个实例 |
+| 单账号、多实例 | 在同一个账号的 `instances` 中增加对象，可配置不同地域 |
+| 多账号、多实例 | 在 `accounts` 数组中增加账号对象，每个账号填写自己的凭据、阈值和实例 |
+
+阈值按账号的共享池设置，同一池中的实例共用该阈值。不要将同一账号拆为多个条目，也不要使用多组 AccessKey 重复配置该账号。
+
+账号条目字段：
 
 | 字段 | 说明 |
 |---|---|
@@ -160,7 +206,52 @@ docker compose down
 | `instances[].name` | 可选的实例名称，默认使用实例 ID |
 | `instances[].paused` | 是否暂停自动控制，JSON 布尔值，默认 `false` |
 
-`limits_gb` 及其中任一阈值均可省略。未知字段会导致配置被拒绝；支持的地域见 [监控程序](src/monitor.py) 中的 `REGIONS`，未知地域会阻止对应账号的控制。
+`limits_gb` 及其中任一阈值均可省略。`name` 可以使用自定义别名或账号 UID，仅用于标识账号。未知字段会导致配置被拒绝；未知地域会阻止对应账号的控制。
+
+### 地域对照表
+
+在 ECS 实例详情中查看地域，并将对应 Region ID 填入 `instances[].region`。填写地域 ID（如 `ap-southeast-1`），不要填写可用区 ID（如 `ap-southeast-1a`）。**新加坡是 `ap-southeast-1`，日本东京是 `ap-northeast-1`。**
+
+下表与当前 [监控程序](src/monitor.py) 的 `REGIONS` 列表一致，流量池一栏表示本项目的统计分类。地域开放状态及账号实际可用范围以阿里云控制台为准。
+
+| 地域 | Region ID | 流量池 |
+|---|---|---|
+| 华北1（青岛） | `cn-qingdao` | 中国内地 |
+| 华北2（北京） | `cn-beijing` | 中国内地 |
+| 华北3（张家口） | `cn-zhangjiakou` | 中国内地 |
+| 华北5（呼和浩特） | `cn-huhehaote` | 中国内地 |
+| 华北6（乌兰察布） | `cn-wulanchabu` | 中国内地 |
+| 华东1（杭州） | `cn-hangzhou` | 中国内地 |
+| 华东2（上海） | `cn-shanghai` | 中国内地 |
+| 华东5（南京，本地地域，关停中） | `cn-nanjing` | 中国内地 |
+| 华东6（福州，本地地域，关停中） | `cn-fuzhou` | 中国内地 |
+| 华中1（武汉，本地地域） | `cn-wuhan-lr` | 中国内地 |
+| 华南1（深圳） | `cn-shenzhen` | 中国内地 |
+| 华南2（河源） | `cn-heyuan` | 中国内地 |
+| 华南3（广州） | `cn-guangzhou` | 中国内地 |
+| 西南1（成都） | `cn-chengdu` | 中国内地 |
+| 华北2金融云（北京） | `cn-beijing-finance-1` | 中国内地 |
+| 华东1金融云（杭州） | `cn-hangzhou-finance` | 中国内地 |
+| 华东2金融云（上海） | `cn-shanghai-finance-1` | 中国内地 |
+| 华南1金融云（深圳） | `cn-shenzhen-finance-1` | 中国内地 |
+| 中国香港 | `cn-hongkong` | 非内地 |
+| 新加坡 | `ap-southeast-1` | 非内地 |
+| 澳大利亚（悉尼，已关停） | `ap-southeast-2` | 非内地 |
+| 马来西亚（吉隆坡） | `ap-southeast-3` | 非内地 |
+| 印度尼西亚（雅加达） | `ap-southeast-5` | 非内地 |
+| 菲律宾（马尼拉） | `ap-southeast-6` | 非内地 |
+| 泰国（曼谷） | `ap-southeast-7` | 非内地 |
+| 日本（东京） | `ap-northeast-1` | 非内地 |
+| 韩国（首尔） | `ap-northeast-2` | 非内地 |
+| 印度（孟买，已关停） | `ap-south-1` | 非内地 |
+| 美国（弗吉尼亚） | `us-east-1` | 非内地 |
+| 美国（硅谷） | `us-west-1` | 非内地 |
+| 英国（伦敦） | `eu-west-1` | 非内地 |
+| 德国（法兰克福） | `eu-central-1` | 非内地 |
+| 阿联酋（迪拜） | `me-east-1` | 非内地 |
+| 沙特（利雅得） | `me-central-1` | 非内地 |
+
+程序保留部分历史地域 ID 的识别能力，不代表这些地域仍可新购或继续运行实例。未列出的地域当前不支持，使用前需核实分类并更新程序列表。地域资料见[阿里云 ECS 地域列表](https://help.aliyun.com/zh/ecs/user-guide/regions-and-zones)、[ECS 服务接入点](https://help.aliyun.com/zh/ecs/developer-reference/api-ecs-2014-05-26-endpoint)、[地域名称变更公告](https://help.aliyun.com/zh/user-center/product-overview/regional-name-change-announcement)和[金融云地域说明](https://help.aliyun.com/zh/document_detail/57348.html)。
 
 ## 运行规则
 

@@ -9,7 +9,6 @@ services:
     environment:
       ALIYUN_ACCOUNTS_FILE: /run/secrets/accounts
       FEISHU_WEBHOOK_FILE: /run/secrets/webhook
-      REPORT_HOUR: ${REPORT_HOUR:-5}
     secrets: [accounts, webhook]
     volumes:
       - monitor-state:/app/.state

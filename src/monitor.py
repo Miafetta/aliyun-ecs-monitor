@@ -99,6 +99,21 @@ def load_config(raw):
     return accounts
 
 
+def load_settings(raw):
+    try:
+        config = json.loads(raw)
+    except (ValueError, TypeError):
+        raise MonitorError("Account configuration must be valid JSON") from None
+    if isinstance(config, list):
+        return load_config(raw), 5
+    if not isinstance(config, dict) or set(config) - {"report_hour", "accounts"}:
+        raise MonitorError("Invalid configuration fields")
+    hour = config.get("report_hour", 5)
+    if type(hour) is not int or not 0 <= hour <= 23:
+        raise MonitorError("report_hour must be an integer from 0 to 23")
+    return load_config(json.dumps(config.get("accounts"))), hour
+
+
 def aggregate(data, required):
     if not isinstance(data, dict) or "Code" in data or data.get("Success") is False:
         raise MonitorError("CDT returned an error")
@@ -343,10 +358,7 @@ def setting(name, file_name):
 def run_once(diagnostic=False):
     path = Path(".state/monitor.json")
     try:
-        accounts = load_config(setting("ALIYUN_ACCOUNTS_JSON", "ALIYUN_ACCOUNTS_FILE"))
-        hour = int(os.environ.get("REPORT_HOUR") or "5")
-        if not 0 <= hour <= 23:
-            raise MonitorError("REPORT_HOUR must be 0..23")
+        accounts, hour = load_settings(setting("ALIYUN_ACCOUNTS_JSON", "ALIYUN_ACCOUNTS_FILE"))
         notifier = None if diagnostic else Feishu(setting("FEISHU_WEBHOOK_URL", "FEISHU_WEBHOOK_FILE"))
         state = load_state(path)
         monitor = Monitor(state, notifier, diagnostic)
