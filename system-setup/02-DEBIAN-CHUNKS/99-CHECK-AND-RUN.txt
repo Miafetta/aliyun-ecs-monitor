@@ -1,0 +1,3 @@
+cat /tmp/02-install-debian13.sh.01.part /tmp/02-install-debian13.sh.02.part /tmp/02-install-debian13.sh.03.part /tmp/02-install-debian13.sh.04.part | gzip -dc > /root/02-install-debian13.sh &&
+echo '9df668fae1d1ef776906633cb58f8ddf6eb2c51e17621258780b15292dacdeb9  /root/02-install-debian13.sh' | sha256sum -c - &&
+sh /root/02-install-debian13.sh

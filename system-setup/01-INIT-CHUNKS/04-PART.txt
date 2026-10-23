@@ -1,0 +1,11 @@
+base64 -d > /tmp/01-init-alpine.sh.04.part <<'DATA_END'
+HtbyrUq0FGu6UzCJiS/JVJGsfLJSoUyKzBXlQGROOSJd7+qWFsibyl89GUMlZ9JtDa410XW3baUa
+yxVNauW5Wq/r5lo8cWvV2sfUSCmojaQu1B3ijhNqV/Mzk0COSEU6OWasWSYWBW/61eytXI6MrNkZ
+BHvPD6zUxQM10a6GooM1EVrmMV1f5Jp8wGeoH33XnzbryC+Xb19oyDUtMo25GjPQFTe5h/w84v7k
+09qhMj/DJJNwZ4yO+Z9QD9DXZU7ky7X0q7d/RVqsOlFWxKGYi1DaZo6jhkDNE/BXALpsIvO0hsMg
+eNcmWMjMlurvNpZojFv1RFEU2Xx52lyBt2/PB1dk0LPCctz/NyeM97PZHiQyetD3vELxzhjir0bA
+ZWjK9fXJxlL9gX/cHez3VdFq86Po+eBogtREGlmsDOlNZdBFwdIFou5QzB83NONOQRXV0qvglNXA
+zkxyzV5zEVnifSQ2icyNGFZJTf2djcZe+orEDZPCK/+Yo0VozEkevnZo/LH5jt0h5EnloVL5FikM
+tLu7BRhXdhuVGRZJQX/yRQHyjzrhfzM46+YqJAAA
+DATA_END
+echo '1b3d2a8ce33d41d6b018ef1e15521e0decb23c2f964a0c682f9d9cb314d5c100  /tmp/01-init-alpine.sh.04.part' | sha256sum -c -

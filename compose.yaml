@@ -1,0 +1,27 @@
+services:
+  monitor:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 2m
+    environment:
+      ALIYUN_ACCOUNTS_FILE: /run/secrets/accounts
+      FEISHU_WEBHOOK_FILE: /run/secrets/webhook
+      REPORT_HOUR: ${REPORT_HOUR:-5}
+    secrets: [accounts, webhook]
+    volumes:
+      - monitor-state:/app/.state
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+secrets:
+  accounts:
+    file: ./accounts.json
+  webhook:
+    file: ./webhook.txt
+volumes:
+  monitor-state:

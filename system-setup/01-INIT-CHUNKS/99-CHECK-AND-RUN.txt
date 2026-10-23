@@ -1,0 +1,3 @@
+cat /tmp/01-init-alpine.sh.01.part /tmp/01-init-alpine.sh.02.part /tmp/01-init-alpine.sh.03.part /tmp/01-init-alpine.sh.04.part | gzip -dc > /tmp/01-init-alpine.sh &&
+echo 'c20bd872808722b43ca6075367b1c1a5ac7792191f15dd6b49bd51b332a87068  /tmp/01-init-alpine.sh' | sha256sum -c - &&
+sh /tmp/01-init-alpine.sh

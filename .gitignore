@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.state/
+accounts.json
+webhook.txt
+.env
