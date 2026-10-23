@@ -4,6 +4,8 @@
 
 运行 `docker compose ps -a` 和 `docker compose logs --tail=100 monitor` 查看状态与错误。确认 Docker 服务正常，项目目录中存在 `accounts.json` 和 `webhook.txt`，且容器可以读取文件。
 
+提示 `Cannot read ALIYUN_ACCOUNTS_FILE` 或 `Cannot read FEISHU_WEBHOOK_FILE` 时，检查对应文件是否存在、是否挂载正确，以及容器读取权限。Compose 在移除其他 capabilities 后保留 `DAC_OVERRIDE`，用于读取宿主机用户拥有的 `600` 权限凭据文件；凭据挂载仍为只读。更新配置后重新运行诊断，已有服务需要重新创建容器。
+
 启动后应看到 `Monitor started`，每轮完成后显示 `Check completed: ok` 或 `failed`。容器为运行状态不代表查询成功；查询和通知失败会在后续轮次重试。请检查服务器到阿里云、飞书的 DNS、HTTPS 连接及系统时间。
 
 提示 `Another monitor is using this state directory` 时，停止共享该数据卷的其他写入进程，不要删除运行中服务的锁文件。不要在多个服务器同时控制相同实例。

@@ -352,7 +352,12 @@ class Monitor:
 
 def setting(name, file_name):
     path = os.environ.get(file_name)
-    return Path(path).read_text(encoding="utf-8-sig").strip() if path else os.environ.get(name, "")
+    if not path:
+        return os.environ.get(name, "")
+    try:
+        return Path(path).read_text(encoding="utf-8-sig").strip()
+    except OSError:
+        raise MonitorError("Cannot read " + file_name + "; check secret file permissions and mount") from None
 
 
 def run_once(diagnostic=False):

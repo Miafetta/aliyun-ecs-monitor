@@ -4,6 +4,8 @@ services:
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
+    # Read host-owned mode-600 secrets; mounts remain read-only.
+    cap_add: [DAC_OVERRIDE]
     security_opt: [no-new-privileges:true]
     stop_grace_period: 2m
     environment:
