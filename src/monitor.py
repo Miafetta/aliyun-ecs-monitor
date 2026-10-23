@@ -389,48 +389,64 @@ def run_once(diagnostic=False):
 
 def test_notifications():
     try:
-        accounts, _ = load_settings(setting("ALIYUN_ACCOUNTS_JSON", "ALIYUN_ACCOUNTS_FILE"))
         notifier = Feishu(setting("FEISHU_WEBHOOK_URL", "FEISHU_WEBHOOK_FILE"))
     except Exception:
-        print("ERROR: Notification test configuration invalid; check accounts and Webhook files", file=sys.stderr)
+        print("ERROR: Notification test configuration invalid; check Webhook file", file=sys.stderr)
         return 1
-    failed = False
 
-    def send(title, sections):
-        nonlocal failed
-        try:
-            notifier.send("\u901a\u77e5\u6d4b\u8bd5 \xb7 " + title, sections)
-        except Exception:
-            failed = True
-            print("ERROR: Test card delivery failed", file=sys.stderr)
+    class ExampleAPI:
+        def __init__(self, status="Running", over=False, error=""):
+            self.current = status
+            self.over = over
+            self.error = error
 
-    sample = "\u6d4b\u8bd5\u793a\u4f8b\uff0c\u975e\u771f\u5b9e\u4e8b\u4ef6\uff1b\u672a\u6267\u884c\u5b9e\u4f8b\u542f\u505c\u3002"
-    send("\u67e5\u8be2\u5f02\u5e38", [f"### \u26a0\ufe0f \u793a\u4f8b\u8d26\u53f7\n{sample}\nCDT \u6216\u5b9e\u4f8b\u72b6\u6001\u67e5\u8be2\u5931\u8d25\uff0c\u672c\u8f6e\u8df3\u8fc7\u8be5\u8d26\u53f7\u63a7\u5236\u3002"])
-    send("\u5171\u4eab\u6d41\u91cf\u6c60\u8fbe\u5230\u9608\u503c", [f"### \U0001f6d1 \u793a\u4f8b\u8d26\u53f7 \xb7 \u975e\u5185\u5730\n{sample}\n\u5171\u4eab\u6c60 180.000 GB\uff0c\u9608\u503c 180 GB\uff1b\u5b9e\u4f8b\u72b6\u6001 Running\u3002"])
-    for action in ACTION_NAMES.values():
-        for title, icon, description in (
-            ("\u8bf7\u6c42\u5df2\u63d0\u4ea4", "\U0001f4e8", "\u8bf7\u6c42\u5df2\u63a5\u53d7\uff0c\u7b49\u5f85\u5b9e\u4f8b\u72b6\u6001\u786e\u8ba4"),
-            ("\u64cd\u4f5c\u5df2\u5b8c\u6210", "\u2705", "\u5df2\u67e5\u8be2\u786e\u8ba4\u76ee\u6807\u72b6\u6001"),
-            ("\u64cd\u4f5c\u7b49\u5f85\u8d85\u65f6", "\u26a0\ufe0f", "\u8d85\u8fc7 15 \u5206\u949f\u672a\u786e\u8ba4\u76ee\u6807\u72b6\u6001"),
-            ("\u63a7\u5236\u8bf7\u6c42\u5931\u8d25", "\u26a0\ufe0f", "\u8bf7\u6c42\u5931\u8d25\uff0c\u540e\u7eed\u8f6e\u6b21\u91cd\u8bd5"),
-        ):
-            send(title + " \xb7 " + action, [f"### {icon} \u793a\u4f8b\u5b9e\u4f8b\n{sample}\n{action}\uff1a{description}\u3002"])
-    send("\u6bcf\u65e5\u62a5\u544a", [f"### \U0001f4ca \u793a\u4f8b\u8d26\u53f7 \xb7 \u975e\u5185\u5730\n{sample}\n\u5171\u4eab\u6c60\uff1a12.500 GB / 180 GB", "### \U0001f5a5\ufe0f \u793a\u4f8b\u5b9e\u4f8b\n\u72b6\u6001\uff1aRunning", "### \u23f8\ufe0f \u793a\u4f8b\u7ef4\u62a4\u5b9e\u4f8b\n\u81ea\u52a8\u63a7\u5236\u5df2\u6682\u505c"])
-    sections = ["### CDT \u771f\u5b9e\u7528\u91cf\n\u67e5\u8be2\u65f6\u95f4\uff08\u5317\u4eac\u65f6\u95f4\uff09\uff1a" + datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S") + "\n\u6570\u636e\u6765\u81ea CDT \u672c\u6b21\u8fd4\u56de\u503c\uff0c\u7528\u91cf\u66f4\u65b0\u53ef\u80fd\u5b58\u5728\u5ef6\u8fdf\u3002"]
-    for account in accounts:
-        try:
-            required = {pool(i["region"]) for i in account["instances"]}
-            totals = aggregate(Aliyun(account).traffic(), required)
-        except Exception:
-            failed = True
-            sections.append(f"### \u26a0\ufe0f {account['name']}\nCDT \u67e5\u8be2\u5931\u8d25\uff0c\u672a\u83b7\u53d6\u7528\u91cf\u3002\u8bf7\u68c0\u67e5\u8d26\u53f7\u6743\u9650\u3001\u5730\u57df\u4e0e\u7f51\u7edc\u3002")
-            print("ERROR: CDT test query failed", file=sys.stderr)
-            continue
-        for category in sorted(required):
-            sections.append(f"### \U0001f4ca {account['name']} \xb7 {POOL_NAMES[category]}\n\u5171\u4eab\u6c60\uff1a{totals[category] / GB:.3f} GB / {account['limits_gb'][category]} GB\n\u539f\u59cb\u7528\u91cf\uff1a{totals[category]} \u5b57\u8282")
-    send("CDT \u771f\u5b9e\u7528\u91cf", sections)
-    print("Notification test completed: " + ("failed" if failed else "ok"), flush=True)
-    return int(failed)
+        def traffic(self):
+            if self.error == "query":
+                raise MonitorError("Simulated query failure")
+            return {"TrafficDetails": [{"BusinessRegionId": "ap-southeast-1", "Traffic": (114514 if self.over else 114) * GB}]}
+
+        def status(self, instance):
+            return self.current
+
+        def act(self, instance, action):
+            if self.error == "control":
+                raise MonitorError("Simulated control failure")
+
+    account = load_config(json.dumps([{"name": "\u793a\u4f8b\u8d26\u53f7114514", "access_key_id": "placeholder", "access_key_secret": "placeholder", "instances": [{"id": "i-example1919810", "region": "ap-southeast-1", "name": "\u793a\u4f8b\u5b9e\u4f8b1919810"}, {"id": "i-paused114514", "region": "ap-southeast-1", "name": "\u793a\u4f8b\u7ef4\u62a4\u5b9e\u4f8b", "paused": True}]}]))[0]
+    now = datetime.now(CST)
+
+    class Delivery:
+        failed = False
+
+        def send(self, title, sections):
+            try:
+                notifier.send(title, sections)
+            except MonitorError:
+                self.failed = True
+                raise
+
+    delivery = Delivery()
+
+    def example():
+        return Monitor({"version": 1, "events": {}, "pending": {}, "report_day": ""}, delivery, now=now)
+
+    monitor = example()
+    monitor.account(account, ExampleAPI(error="query"))
+    instance = account["instances"][0]
+    key = state_key(account["name"], instance["region"], instance["id"])
+    for action, initial, target in (("StartInstance", "Stopped", "Running"), ("StopInstance", "Running", "Stopped")):
+        for scenario in ("submitted", "completed", "timeout", "failed"):
+            monitor = example()
+            if scenario != "submitted":
+                monitor.state["events"][state_key(key, "over", now.strftime("%Y-%m"))] = now.timestamp()
+            if scenario in {"completed", "timeout"}:
+                monitor.state["pending"][key] = {"action": action, "at": now.timestamp() - (901 if scenario == "timeout" else 1), "notified": True}
+            monitor.account(account, ExampleAPI(target if scenario == "completed" else initial, action == "StopInstance", "control" if scenario == "failed" else ""))
+    monitor = example()
+    monitor.account(account, ExampleAPI())
+    monitor.report(0)
+    print("Notification test completed: " + ("failed" if delivery.failed else "ok"), flush=True)
+    return int(delivery.failed)
 
 
 def main():
@@ -439,7 +455,7 @@ def main():
     mode.add_argument("--diagnose", action="store_true", help="Query only; no control, notifications or state writes")
     mode.add_argument("--preview", action="store_true", help="Print example cards without credentials or network")
     mode.add_argument("--serve", action="store_true", help="Run continuously, checking every five minutes")
-    mode.add_argument("--test-notification", action="store_true", help="Send all sample notifications, then query CDT; no control or state writes")
+    mode.add_argument("--test-notification", action="store_true", help="Send production notification cards with sample data; no cloud calls or state writes")
     args = parser.parse_args()
     if args.test_notification:
         return test_notifications()
