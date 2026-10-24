@@ -1,6 +1,6 @@
 # 阿里云 ECS 保活监控
 
-在服务器上通过 Docker Compose 持续监控阿里云 ECS，依据账号共享 CDT 流量池用量自动启停实例，并通过飞书发送通知和日报。支持多账号、多地域，使用 Python 3.14。
+在服务器上通过 Docker Compose 持续监控阿里云 ECS，依据账号共享 CDT 流量池用量自动启停实例，并通过飞书发送通知和日报。支持多账号、多地域，使用 Python 3.14.9。
 
 ## 功能
 
@@ -277,9 +277,10 @@ CDT 和实例状态查询遇到临时网络错误、超时、限流或部分服�
 
 ## 本地使用
 
-使用 Python 3.14 安装依赖并预览通知卡片：
+使用 Python 3.14.9 或更高版本安装依赖并预览通知卡片：
 
 ```sh
+python -m pip install --upgrade "pip>=26.2.2"
 python -m pip install -r requirements.txt
 python -m src.monitor --preview
 ```
